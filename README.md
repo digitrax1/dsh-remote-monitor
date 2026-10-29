@@ -7,6 +7,32 @@
 主机列表**不需要重新录一遍**：插件自动读取你已有的 `~/.ssh/config` 和 dsh-ssh
 插件的主机配置。你配置过 SSH 的机器，装完就能看到。
 
+## 效果图
+
+截图使用演示数据（主机名、IP 均为示例），真实面板读取你自己的 `~/.ssh/config`。
+
+| 总览 | 空闲机器（按空闲指数排序） |
+| --- | --- |
+| ![总览](docs/screenshots/overview.png) | ![空闲机器](docs/screenshots/idle.png) |
+
+### 单机详情：8 张 GPU 压到一屏
+
+GPU 每卡一行，进程表 / 磁盘 IO / 网络默认折叠。
+
+![单机详情](docs/screenshots/detail.png)
+
+### 侧边栏机器列表
+
+<p>
+  <img src="docs/screenshots/sidebar-list.png" width="300" alt="侧边栏机器列表" />
+</p>
+
+### 阈值与低使用率提醒 / 指标说明
+
+| 阈值弹窗 | 指标说明 |
+| --- | --- |
+| ![阈值](docs/screenshots/thresholds.png) | ![指标说明](docs/screenshots/help.png) |
+
 ---
 
 ## 能力
