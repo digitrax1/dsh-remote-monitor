@@ -1,0 +1,50 @@
+{
+  "name": "dsh-remote-monitor",
+  "version": "0.8.1",
+  "private": true,
+  "description": "Remote host resource monitoring for the DeepSeek Harness Web GUI: CPU / memory / swap / disk usage & IO / network / NVIDIA GPU / top processes over SSH, with a live sidebar dashboard, an idle-capacity ranking (which machine can take the next job), a low-utilisation reminder, an idle index (time × GPU utilisation), a sidebar-footer machine list, and read-only agent tools (rmon_*). Host list is discovered from ~/.ssh/config and the dsh-ssh store, so nothing has to be entered twice.",
+  "icon": "icon.svg",
+  "type": "module",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": {
+      "default": "./src/index.js"
+    },
+    "./client": {
+      "default": "./src/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "dependencies": {
+    "ssh2": "^1.17.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@deepseek-ai/dsh-host-webserver": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.0-rc.1",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "license": "Apache-2.0"
+}
