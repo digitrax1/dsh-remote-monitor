@@ -141,7 +141,16 @@ export function renderHost(host, options = {}) {
         : `CPU ${host.idleIndex.utilPercent}%`
       lines.push(`  idle index: ${host.idleIndex.index}/100 (${part} · ${Math.round((host.idleIndex.timeScore ?? 0))} time score · idle ${formatUptime(host.idleIndex.idleForSec ?? 0)})`)
     }
-    if (host.lowUsage?.low === true) {
+    const offline = host.offline ?? null
+  if (offline !== null) {
+    const owners = Array.isArray(offline.owners) ? offline.owners : []
+    if (owners.length > 0) {
+      lines.push('  owners: ' + owners.map(owner => `${owner.name} (${owner.count} proc${owner.count === 1 ? '' : 's'})`).join(', '))
+    }
+    const users = Array.isArray(offline.users) ? offline.users : []
+    if (users.length > 0) lines.push('  workspaces: ' + users.join(', '))
+  }
+  if (host.lowUsage?.low === true) {
       lines.push(`  usage: low · under-used for ${formatUptime(host.lowUsage.forSec ?? 0)} (${host.lowUsage.reason ?? 'below threshold'})`)
     }
 
@@ -209,11 +218,13 @@ export function renderInventory(hosts, thresholds) {
   if (hosts.length === 0) {
     return 'No hosts are known. Add one to ~/.ssh/config (or to the dsh-ssh plugin), then call rmon_list again.'
   }
-  const rows = ['alias | target | source | monitor | status | cpu | mem | gpu | idle | disk | last sample', '--- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---']
+  const rows = ['alias | target | source | monitor | status | cpu | mem | gpu | owner | idle | disk | last sample', '--- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---']
   for (const host of hosts) {
     const gpu = (host.gpus ?? []).length > 0
       ? `${Math.max(...host.gpus.map(item => item.utilPercent ?? 0)).toFixed(0)}% x${host.gpus.length}`
       : '-'
+    const owners = Array.isArray(host.offline?.owners) ? host.offline.owners : []
+    const owner = owners.length === 0 ? '-' : `${owners[0].name} (${owners[0].count})`
     const capacity = host.capacity
     const idle = capacity === null || capacity === undefined || capacity.score === null
       ? '-'
@@ -230,6 +241,7 @@ export function renderInventory(hosts, thresholds) {
       formatPercent(host.cpu?.percent, 0),
       formatPercent(host.mem?.percent, 0),
       gpu,
+      owner,
       idle,
       disk,
       formatTime(host.lastSampleAt),

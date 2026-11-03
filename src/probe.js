@@ -75,6 +75,9 @@ function isReportableMount(mount) {
 export function buildProbeScript(options = {}) {
   const topN = Math.max(1, Math.min(100, Math.trunc(Number(options.topN ?? 8)) || 8))
   const light = options.light === true
+  const offline = options.offline ?? {}
+  const scanOffline = offline.scan !== false
+  const offlineRoots = Array.isArray(offline.roots) ? offline.roots : []
   const lines = [
     "RM='" + MARK + "'",
     'echo "$RM probe"',
@@ -117,6 +120,27 @@ export function buildProbeScript(options = {}) {
       'echo "$RM gpuapps"',
       'nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_memory --format=csv,noheader,nounits 2>/dev/null',
     )
+    if (scanOffline) {
+      // Who is using this box: the shared workspace keeps one directory per
+      // person under `<mount>/offline/`, and running jobs usually carry that
+      // path in their argv. Both are read in the same round trip.
+      lines.push('echo "$RM offline"')
+      if (offlineRoots.length > 0) {
+        for (const root of offlineRoots) {
+          lines.push(`if [ -d '${root}' ]; then ls -1p '${root}' 2>/dev/null | sed -n 's:/$::p'; fi`)
+        }
+      } else {
+        lines.push("for m in /mnt/* /data/* /home/*; do [ -d \"$m/offline\" ] && ls -1p \"$m/offline\" 2>/dev/null | sed -n 's:/$::p'; done")
+      }
+      lines.push('echo "$RM owners"')
+      if (offlineRoots.length > 0) {
+        for (const root of offlineRoots) {
+          lines.push(`if [ -d '${root}' ]; then ps -eo args= 2>/dev/null | grep -o '${root}/[^/ ]*' | sed 's:.*/::' | sort | uniq -c | sort -rn | head -n 20; fi`)
+        }
+      } else {
+        lines.push("ps -eo args= 2>/dev/null | grep -o '/offline/[^/ ]*' | sed 's:.*/offline/::' | sort | uniq -c | sort -rn | head -n 20")
+      }
+    }
   }
   lines.push('echo "$RM end"', '')
   return lines.join('\n')
@@ -418,6 +442,17 @@ export function parseGpus(gpuLines, appLines) {
  * @returns {object} the raw probe: cumulative counters plus the heavy sections
  *   that only a full probe carries (absent keys when it was a light probe).
  */
+/**
+ * One line of the owners section: `<count> <name>`.
+ * @param {string} line - raw line.
+ * @returns {{ name: string, count: number }|null} the owner, or null.
+ */
+export function parseOfflineOwner(line) {
+  const match = String(line ?? '').trim().match(/^(\d+)\s+(\S+)$/)
+  if (match === null) return null
+  return { count: Number(match[1]), name: match[2] }
+}
+
 export function parseProbe(text) {
   const sections = splitSections(text)
   const get = name => sections.get(name) ?? []
@@ -459,6 +494,12 @@ export function parseProbe(text) {
     raw.psCpu = parsePs(get('ps'))
     raw.psMem = parsePs(get('psmem'))
     raw.gpus = parseGpus(get('gpu'), get('gpuapps'))
+  }
+  if (sections.has('offline') || sections.has('owners')) {
+    raw.offline = {
+      users: [...new Set(get('offline').map(line => line.trim()).filter(line => line !== ''))],
+      owners: get('owners').map(parseOfflineOwner).filter(Boolean),
+    }
   }
   return raw
 }
@@ -649,6 +690,7 @@ export function deriveSample({ prev, curr, full, dtMs, options = {} }) {
     gpus,
     topCpu,
     topMem,
+    offline: heavy.offline ?? { users: [], owners: [] },
     system: {
       ...heavy.system,
       uptimeSec: curr.uptimeSec ?? null,

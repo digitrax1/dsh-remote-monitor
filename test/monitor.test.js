@@ -51,6 +51,12 @@ const IDLE_PROBE = [
   '1, GPU-bbb, NVIDIA L20, 0, 2000, 49152, 31, 42.00, 350.00, 30, 1900',
   '@@RMON gpuapps',
   '',
+  '@@RMON offline',
+  'wufeng164',
+  'liuyanbo',
+  '@@RMON owners',
+  '      7 wufeng164',
+  '      2 liuyanbo',
   '@@RMON end',
 ].join('\n')
 
@@ -108,6 +114,9 @@ test('read() attaches capacity and a free host is schedulable', async () => {
     assert.equal(history[0].freeGpu, 2)
     assert.equal(typeof payload.idleIndex.index, 'number', 'every sample carries an idle index')
     assert.equal(history[0].index, payload.idleIndex.index, 'history keeps the index for charts')
+    assert.deepEqual(payload.offline.users, ['wufeng164', 'liuyanbo'])
+    assert.equal(payload.offline.owners[0].name, 'wufeng164')
+    assert.equal(payload.offline.owners[0].count, 7)
   } finally {
     monitor.dispose()
   }

@@ -119,6 +119,15 @@ export const Config = z.object({
     forSec: z.number().default(600),
   }).default({}),
   /**
+   * Workspace owner detection: list `<mount>/offline/` directories and the
+   * user paths appearing in running process command lines. `roots` empty means
+   * auto-discover under /mnt, /data and /home.
+   */
+  offline: z.object({
+    scan: z.boolean().default(true),
+    roots: z.string().default(''),
+  }).default({}),
+  /**
    * Idle index: one 0..100 number blending how long a machine has been idle
    * with how little its GPU is doing. See `capacity.js` for the formula.
    */
@@ -161,6 +170,7 @@ export const GUIDANCE = '本机已安装 dsh-remote-monitor 插件（DSH 远程�
   + '主机列表自动来自 ~/.ssh/config 与 dsh-ssh 插件的 ~/.dsh/dsh-ssh.json，无需重复录入；认证优先使用 ssh-agent 与默认私钥，其次才是已保存的密码。'
   + '限制：这些工具只能读取，不能执行任意命令（需要执行命令请用 ssh_exec）；百分比是两次采样之间的区间值，首次读取只给绝对值；采样由界面或工具调用驱动，无人使用时自动停止轮询。'
   + '空闲指数（0..100）= 空闲时长（半衰期默认 30 分钟）+ 利用率空闲度（GPU 机器看各卡平均，CPU 机器看 CPU）各占一半，用于排序「哪台最闲」；面板默认只列出可连接的机器。'
+  + '面板还会读取各挂载点下 offline/ 的用户目录、并从运行进程的命令行识别「占用者」（谁在这台机器上跑），显示在卡片、详情、侧边栏与 rmon_* 报告里。'
   + '侧边栏底部有一条「机器空余」小条：显示空闲机器与空闲 GPU，点击展开低使用率机器列表；它会在页面打开时按 pollSec（默认 60 秒）主动采样一次。'
   + '空余度按 GPU/CPU/内存加权计算（有 GPU 的机器 GPU 权重最高），磁盘≥90% 或内存≥90% 会标记为不可调度；「持续空闲」是连续两次以上采样的结果，首次采样不算。'
   + '用户提到「远程机器资源/CPU/内存/磁盘/GPU 使用率/哪台机器忙/哪台机器空着/有空闲的卡吗/显存/进程」时即指本插件。'
@@ -193,6 +203,11 @@ function readConfig(config) {
   if (typeof idleIndex === 'object' && idleIndex !== null) {
     out.idleIndex = {}
     for (const [key, value] of Object.entries(idleIndex)) out.idleIndex[key] = resolveField(value, undefined)
+  }
+  const offline = resolveField(raw.offline, undefined)
+  if (typeof offline === 'object' && offline !== null) {
+    out.offline = {}
+    for (const [key, value] of Object.entries(offline)) out.offline[key] = resolveField(value, undefined)
   }
   const footer = resolveField(raw.footer, undefined)
   if (typeof footer === 'object' && footer !== null) {

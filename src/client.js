@@ -100,6 +100,12 @@ window.__ModuleLoader__.load({
       'cap.showAll': '显示全部机器',
       'cap.hint': '空余度 = GPU / 内存 / CPU 加权（有 GPU 的机器以显卡为主）；磁盘 ≥90% 或内存 ≥90% 视为不可调度；「持续空闲」需连续采样。',
       'idle.index': '空闲指数',
+      'owner.label': '占用者',
+      'owner.title': '占用者与工作区',
+      'owner.procs': '个进程',
+      'owner.none': '没有检测到活跃用户',
+      'owner.workspaces': '工作区',
+      'owner.hint': '读取 <mount>/offline/ 下的用户目录，并从运行中的进程命令行识别',
       'idle.indexHint': '空闲指数 = 空闲时长（半衰期 30 分钟）+ 利用率空闲度（GPU 机器取各卡平均，CPU 机器取 CPU%），各占一半。',
       'cap.helpTitle': '这些数字是什么',
       'cap.helpScore': '空余度：这台机器能不能接新任务。GPU / CPU / 内存加权；GPU 机器一张空闲卡都没有时封顶 25。',
@@ -260,6 +266,12 @@ window.__ModuleLoader__.load({
       'cap.showAll': 'Show all hosts',
       'cap.hint': 'Headroom = GPU / memory / CPU weighted (the GPU dominates on a GPU host); a disk ≥90% or memory ≥90% is not schedulable; "idle for" needs consecutive samples.',
       'idle.index': 'Idle index',
+      'owner.label': 'Owner',
+      'owner.title': 'Owners & workspaces',
+      'owner.procs': 'procs',
+      'owner.none': 'No active user detected',
+      'owner.workspaces': 'Workspaces',
+      'owner.hint': 'Read from <mount>/offline/ directories and running process command lines',
       'idle.indexHint': 'Idle index = idle time (30 min half-life) + utilisation headroom (mean GPU, or CPU% on a CPU host), 50/50.',
       'cap.helpTitle': 'What do these numbers mean',
       'cap.helpScore': 'Free capacity: can this host take a new job? GPU / CPU / memory weighted; capped at 25 when a GPU host has no free card.',
@@ -524,6 +536,12 @@ window.__ModuleLoader__.load({
 .drm-tag{font-size:10.5px;padding:1px 6px;border-radius:5px;border:1px solid color-mix(in srgb,currentColor 20%,transparent);opacity:.75}
 .drm-sources{font-size:11px;opacity:.55;display:flex;gap:14px;flex-wrap:wrap}
 .drm-note{font-size:11px;opacity:.5}
+.drm-ownerline{font-size:11px;opacity:.72;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drm-owners{display:flex;flex-direction:column;gap:4px}
+.drm-ownerrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;padding:3px 0;border-top:1px solid color-mix(in srgb,currentColor 8%,transparent)}
+.drm-ownerrow:first-child{border-top:none}
+.drm-ownerrow b{font-weight:620}
+.drm-ownerrow span{opacity:.55;font-size:11px;font-variant-numeric:tabular-nums}
 .drm-svg{display:block;width:100%;height:auto;overflow:visible}
 .drm-select{appearance:none;border:1px solid color-mix(in srgb,currentColor 20%,transparent);background-color:color-mix(in srgb,currentColor 5%,transparent);color:inherit;border-radius:7px;padding:5px 26px 5px 10px;font:inherit;font-size:12px;cursor:pointer;max-width:280px;line-height:1.6;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 14px) 52%,calc(100% - 9px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
 .drm-select:hover{background-color:color-mix(in srgb,currentColor 10%,transparent)}
@@ -1060,7 +1078,12 @@ window.__ModuleLoader__.load({
           h('div', { className: 'drm-hostname' },
             h('span', { className: 'drm-dot', style: { background: hostTone(host) } }),
             host.label ?? host.alias),
-          h('div', { className: 'drm-target' }, `${host.user}@${host.host}:${host.port}`)),
+          h('div', { className: 'drm-target' }, `${host.user}@${host.host}:${host.port}`),
+          (host.offline?.owners ?? []).length > 0
+            ? h('div', { className: 'drm-ownerline', title: tt('owner.hint') },
+              `${tt('owner.label')} `,
+              host.offline.owners.slice(0, 2).map(owner => `${owner.name} · ${owner.count}`).join('  '))
+            : null),
         h('div', { style: { textAlign: 'right', flex: 'none', display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' } },
           h(CapacityBadge, { host, showIdle: true }),
           h('div', { className: 'drm-pill' }, hostStateText(host)),
@@ -1283,6 +1306,22 @@ window.__ModuleLoader__.load({
                 h('span', { key: 'p', style: { color: toneFor(mount.usePercent, thresholds.disk) } }, percent(mount.usePercent)),
               ]),
             }))),
+
+        host.offline !== null && host.offline !== undefined
+          && ((host.offline.owners ?? []).length > 0 || (host.offline.users ?? []).length > 0)
+          ? h('div', { className: 'drm-panel' },
+            h('div', { className: 'drm-panelhead' },
+              h('div', { className: 'drm-paneltitle' }, tt('owner.title')),
+              h('div', { className: 'drm-mini' }, tt('owner.hint'))),
+            (host.offline.owners ?? []).length > 0
+              ? h('div', { className: 'drm-owners' }, host.offline.owners.map(owner => h('div', { key: owner.name, className: 'drm-ownerrow' },
+                h('b', null, owner.name),
+                h('span', null, `${owner.count} ${tt('owner.procs')}`))))
+              : h('div', { className: 'drm-note' }, tt('owner.none')),
+            (host.offline.users ?? []).length > 0
+              ? h('div', { className: 'drm-mini' }, `${tt('owner.workspaces')}: ${host.offline.users.join(' · ')}`)
+              : null)
+          : null,
 
         gpus.length > 0
           ? h(GpuSummary, { gpus, capacity: host.capacity, thresholds })
@@ -1975,7 +2014,8 @@ window.__ModuleLoader__.load({
               }),
               h('span', { className: 'drm-footalias' }, host.alias),
               h('b', { className: 'drm-footidx', style: { color: idleIndexTone(index) } }, index === null || index === undefined ? '—' : index),
-              h('span', { className: 'drm-footmeta' }, gpuText, ' · ', duration(host.idleForSec)))
+              h('span', { className: 'drm-footmeta' }, gpuText, ' · ', duration(host.idleForSec),
+                (host.offline?.owners ?? []).length > 0 ? ` · ${host.offline.owners[0].name}` : ''))
             })))
     }
 

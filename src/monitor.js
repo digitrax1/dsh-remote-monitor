@@ -134,6 +134,8 @@ export function tuningFrom(config = {}) {
     includeLoopbackNet: config.includeLoopbackNet === true,
     netInterfaces: toStringArray(config.netInterfaces),
     diskDevices: toStringArray(config.diskDevices),
+    offlineScan: config.offline?.scan !== false,
+    offlineRoots: toStringArray(config.offline?.roots),
     capacity: normalizeCapacity(config.capacity),
     idleIndex: normalizeIdleIndex(config.idleIndex),
     lowUsage: normalizeLowUsage(config.lowUsage),
@@ -186,8 +188,9 @@ export class Monitor {
     this.idleIndexOptions = normalizeIdleIndex(this.idleIndex)
     this.lowUsageOptions = normalizeLowUsage(this.lowUsage)
     this.footer = normalizeFooterConfig(this.footer)
-    this.fullCommand = encodeProbeCommand(buildProbeScript({ topN: this.topN }))
-    this.lightCommand = encodeProbeCommand(buildProbeScript({ topN: this.topN, light: true }))
+    const offline = { scan: this.offlineScan, roots: this.offlineRoots }
+    this.fullCommand = encodeProbeCommand(buildProbeScript({ topN: this.topN, offline }))
+    this.lightCommand = encodeProbeCommand(buildProbeScript({ topN: this.topN, light: true, offline }))
   }
 
   /**
@@ -217,6 +220,8 @@ export class Monitor {
       includeLoopbackNet: this.includeLoopbackNet,
       netInterfaces: [...this.netInterfaces],
       diskDevices: [...this.diskDevices],
+      offlineScan: this.offlineScan,
+      offlineRoots: [...this.offlineRoots],
       capacity: { ...this.capacity },
     }
   }
@@ -515,6 +520,7 @@ export class Monitor {
       gpus: sample?.gpus ?? [],
       topCpu: sample?.topCpu ?? [],
       topMem: sample?.topMem ?? [],
+      offline: sample?.offline ?? null,
       capacity: sample?.capacity ?? null,
       idleIndex: sample?.idleIndex ?? null,
       lowUsage: sample === null

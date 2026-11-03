@@ -19,6 +19,7 @@ import {
   parseNetDev,
   parsePs,
   parseGpus,
+  parseOfflineOwner,
   parseProbe,
   deriveSample,
   evaluateAlerts,
@@ -344,4 +345,37 @@ test('evaluateAlerts: fires on the configured thresholds and stays quiet below',
   assert.ok(!keys.includes('cpu'), 'cpu at 17.3% is below 90')
 
   assert.deepEqual(evaluateAlerts(sample, {}), [], 'a threshold of 0 disables the rule')
+})
+
+test('buildProbeScript: offline sections appear in the full probe only', () => {
+  const full = buildProbeScript({ topN: 5 })
+  assert.match(full, /@@|RM offline/) // marker is expanded remotely; the script echoes it
+  assert.match(full, /ls -1p/)
+  assert.match(full, /grep -o '\/offline\/\[\^\/ \]\*'/)
+  const light = buildProbeScript({ topN: 5, light: true })
+  assert.doesNotMatch(light, /ls -1p/)
+})
+
+test('parseProbe: offline directories become workspaces, and owners keep counts', () => {
+  const raw = parseProbe([
+    '@@RMON offline',
+    'wufeng164',
+    'liuyanbo',
+    'wufeng164',
+    '@@RMON owners',
+    '      7 wufeng164',
+    '      2 liuyanbo',
+    '@@RMON end',
+  ].join('\n'))
+  assert.deepEqual(raw.offline.users, ['wufeng164', 'liuyanbo'])
+  assert.deepEqual(raw.offline.owners, [
+    { count: 7, name: 'wufeng164' },
+    { count: 2, name: 'liuyanbo' },
+  ])
+})
+
+test('parseOfflineOwner: tolerates junk lines', () => {
+  assert.deepEqual(parseOfflineOwner('   12 alice'), { count: 12, name: 'alice' })
+  assert.equal(parseOfflineOwner('not a count'), null)
+  assert.equal(parseOfflineOwner(''), null)
 })
