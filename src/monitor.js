@@ -520,6 +520,7 @@ export class Monitor {
       gpus: sample?.gpus ?? [],
       topCpu: sample?.topCpu ?? [],
       topMem: sample?.topMem ?? [],
+      gpuProcs: sample?.gpuProcs ?? [],
       offline: sample?.offline ?? null,
       capacity: sample?.capacity ?? null,
       idleIndex: sample?.idleIndex ?? null,

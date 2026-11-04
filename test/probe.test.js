@@ -379,3 +379,32 @@ test('parseOfflineOwner: tolerates junk lines', () => {
   assert.equal(parseOfflineOwner('not a count'), null)
   assert.equal(parseOfflineOwner(''), null)
 })
+
+test('deriveSample: GPU compute processes are joined with ps rows by pid', () => {
+  const raw = parseProbe([
+    '@@RMON gpu',
+    '0, GPU-aaa, NVIDIA L20, 0, 1000, 49152, 30, 40.00, 350.00, 30, 1900',
+    '1, GPU-bbb, NVIDIA L20, 0, 2000, 49152, 31, 42.00, 350.00, 30, 1900',
+    '@@RMON gpuapps',
+    'GPU-aaa, 1234, python3, 46000',
+    '@@RMON gpups',
+    '  1234 python3 99.0 1.2 2097152 python3 train.py --steps 10',
+    '@@RMON end',
+  ].join('\n'))
+  const sample = deriveSample({ prev: null, curr: raw, full: raw, dtMs: 0, options: {} })
+  assert.equal(sample.gpuProcs.length, 1)
+  const proc = sample.gpuProcs[0]
+  assert.equal(proc.pid, 1234)
+  assert.equal(proc.gpuIndex, 0)
+  assert.equal(proc.cpuPercent, 99)
+  assert.equal(proc.rssBytes, 2 * 1024 ** 3)
+  assert.equal(proc.gpuMemBytes, 46000 * 1024 * 1024)
+  assert.match(proc.command, /train\.py/)
+})
+
+test('buildProbeScript: the GPU process probe asks nvidia-smi for pids and ps for the rest', () => {
+  const script = buildProbeScript({ topN: 3 })
+  assert.match(script, /@@|RM gpups/)
+  assert.match(script, /query-compute-apps=pid/)
+  assert.match(script, /ps -o pid=,comm=,pcpu=,pmem=,rss=,args= -p/)
+})

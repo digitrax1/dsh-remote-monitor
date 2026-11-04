@@ -1178,6 +1178,51 @@ window.__ModuleLoader__.load({
         })))
     }
 
+    /**
+     * Processes holding a GPU: one row per (pid, card), sorted by VRAM. CPU and
+     * RSS come from the same probe's `ps -p`, so there is no second round trip.
+     */
+    function GpuProcTable({ processes }) {
+      const [openKey, setOpenKey] = React.useState(null)
+      const rows = Array.isArray(processes) ? processes : []
+      return h('table', { className: 'drm-table drm-proctable' },
+        h('colgroup', null,
+          h('col', { style: { width: '8%' } }),
+          h('col', { style: { width: '8%' } }),
+          h('col', { style: { width: '14%' } }),
+          h('col', { style: { width: '13%' } }),
+          h('col', { style: { width: '9%' } }),
+          h('col', { style: { width: '11%' } }),
+          h('col', { style: { width: '37%' } })),
+        h('thead', null, h('tr', null,
+          h('th', null, tt('table.pid')),
+          h('th', null, tt('metric.gpu')),
+          h('th', null, tt('table.name')),
+          h('th', { className: 'drm-num' }, tt('gpu.mem')),
+          h('th', { className: 'drm-num' }, tt('table.cpu')),
+          h('th', { className: 'drm-num' }, tt('table.rss')),
+          h('th', null, tt('table.command')))),
+        h('tbody', null, rows.map(process => {
+          const key = `${process.pid}:${process.gpuIndex}`
+          const open = openKey === key
+          return h(React.Fragment, { key },
+            h('tr', {
+              className: 'drm-procrow',
+              'data-open': open ? '1' : '0',
+              title: open ? undefined : tt('proc.expandHint'),
+              onClick: () => setOpenKey(current => current === key ? null : key),
+            },
+            h('td', null, String(process.pid)),
+            h('td', null, `GPU${process.gpuIndex}`),
+            h('td', null, process.name),
+            h('td', { className: 'drm-num' }, bytes(process.gpuMemBytes)),
+            h('td', { className: 'drm-num' }, process.cpuPercent === null || process.cpuPercent === undefined ? '—' : percent(process.cpuPercent)),
+            h('td', { className: 'drm-num' }, bytes(process.rssBytes)),
+            h('td', { className: 'drm-cmdcell' }, h('span', { className: 'drm-cmd' }, process.command ?? ''))),
+            open ? h('tr', { className: 'drm-cmdfull' }, h('td', { colSpan: 7 }, h('pre', null, process.command ?? ''))) : null)
+        })))
+    }
+
     /** A collapsible detail panel: title row, optional meta, body only when open. */
     function Section({ title, meta, children, open: initialOpen }) {
       const [open, setOpen] = React.useState(initialOpen === true)
@@ -1327,12 +1372,16 @@ window.__ModuleLoader__.load({
           ? h(GpuSummary, { gpus, capacity: host.capacity, thresholds })
           : null,
 
-        (host.topCpu ?? []).length > 0 || (host.topMem ?? []).length > 0
+        (host.topCpu ?? []).length > 0 || (host.topMem ?? []).length > 0 || (host.gpuProcs ?? []).length > 0
           ? h('div', { className: 'drm-detailgrid' },
             h(Section, { title: `${tt('section.processes')} · ${tt('proc.byCpu')}`, meta: `${(host.topCpu ?? []).length}`, open: false },
               h(ProcessTable, { key: 'cpu-' + host.alias, processes: host.topCpu ?? [] })),
             h(Section, { title: `${tt('section.processes')} · ${tt('proc.byMem')}`, meta: `${(host.topMem ?? []).length}`, open: false },
-              h(ProcessTable, { key: 'mem-' + host.alias, processes: host.topMem ?? [] })))
+              h(ProcessTable, { key: 'mem-' + host.alias, processes: host.topMem ?? [] })),
+            (host.gpuProcs ?? []).length > 0
+              ? h(Section, { title: `${tt('section.processes')} · ${tt('metric.gpu')}`, meta: `${(host.gpuProcs ?? []).length}`, open: false },
+                h(GpuProcTable, { key: 'gpu-' + host.alias, processes: host.gpuProcs ?? [] }))
+              : null)
           : null,
 
         (host.diskIo ?? []).length > 0 || (host.net ?? []).length > 0

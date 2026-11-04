@@ -261,3 +261,24 @@ test('the idle index grows as the host stays idle', async () => {
     monitor.dispose()
   }
 })
+
+const GPU_PROC_PROBE = IDLE_PROBE
+  .replace('@@RMON gpuapps\n\n', '@@RMON gpuapps\nGPU-aaa, 1234, python3, 46000\n')
+  .replace('@@RMON end', '@@RMON gpups\n  1234 python3 99.0 1.2 2097152 python3 train.py --steps 10\n@@RMON end')
+
+test('the payload carries GPU processes with card index and ps details', async () => {
+  const { monitor, alias } = makeMonitor('gpu-proc', GPU_PROC_PROBE)
+  try {
+    const payload = await monitor.readNow(alias, { fresh: true })
+    assert.equal(payload.gpuProcs.length, 1)
+    const proc = payload.gpuProcs[0]
+    assert.equal(proc.pid, 1234)
+    assert.equal(proc.gpuIndex, 0)
+    assert.equal(proc.cpuPercent, 99)
+    assert.equal(proc.rssBytes, 2 * 1024 ** 3)
+    assert.match(proc.command, /train\.py/)
+    assert.equal(proc.gpuMemBytes, 46000 * 1024 * 1024)
+  } finally {
+    monitor.dispose()
+  }
+})

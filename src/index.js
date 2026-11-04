@@ -166,7 +166,7 @@ export const Config = z.object({
 /** The model-facing announcement. */
 export const GUIDANCE = '本机已安装 dsh-remote-monitor 插件（DSH 远程资源监控）：侧边栏「监控」入口有实时仪表盘（CPU/内存/Swap/磁盘用量与 IO/网络/GPU 曲线 + 进程表 + 阈值告警）。'
   + '告警除了阈值上限，还有「低使用率提醒」：机器连续空闲（GPU 平均利用率或 CPU 低于阈值）超过设定时长会记一条 warn 告警，可在面板「阈值」里改。'
-  + '工具：rmon_list 列出被监控的远程机器；rmon_idle 按空余容量给机器排序（空闲 GPU、空余核数/内存、持续空闲时长、阻塞原因），回答「哪台机器能接新任务」；rmon_status 读取一台或全部机器的实时资源使用；rmon_gpu 读取 NVIDIA 卡（利用率/显存/温度/功耗/占用进程）；rmon_processes 按 CPU 或内存列出最忙的进程；rmon_alerts 查询阈值告警。'
+  + '工具：rmon_list 列出被监控的远程机器；rmon_idle 按空余容量给机器排序（空闲 GPU、空余核数/内存、持续空闲时长、阻塞原因），回答「哪台机器能接新任务」；rmon_status 读取一台或全部机器的实时资源使用；rmon_gpu 读取 NVIDIA 卡（利用率/显存/温度/功耗/占用进程）；rmon_processes 按 CPU、内存或 GPU 显存列出最忙的进程；rmon_alerts 查询阈值告警。'
   + '主机列表自动来自 ~/.ssh/config 与 dsh-ssh 插件的 ~/.dsh/dsh-ssh.json，无需重复录入；认证优先使用 ssh-agent 与默认私钥，其次才是已保存的密码。'
   + '限制：这些工具只能读取，不能执行任意命令（需要执行命令请用 ssh_exec）；百分比是两次采样之间的区间值，首次读取只给绝对值；采样由界面或工具调用驱动，无人使用时自动停止轮询。'
   + '空闲指数（0..100）= 空闲时长（半衰期默认 30 分钟）+ 利用率空闲度（GPU 机器看各卡平均，CPU 机器看 CPU）各占一半，用于排序「哪台最闲」；面板默认只列出可连接的机器。'

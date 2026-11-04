@@ -119,6 +119,9 @@ export function buildProbeScript(options = {}) {
       'nvidia-smi --query-gpu=index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,fan.speed,clocks.sm --format=csv,noheader,nounits 2>/dev/null',
       'echo "$RM gpuapps"',
       'nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_memory --format=csv,noheader,nounits 2>/dev/null',
+      'echo "$RM gpups"',
+      "_gpids=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader,nounits 2>/dev/null | tr -d ' ' | grep -E '^[0-9]+$' | tr '\n' ',' | sed 's/,$//')",
+      'if [ -n "$_gpids" ]; then ps -o pid=,comm=,pcpu=,pmem=,rss=,args= -p "$_gpids" 2>/dev/null; fi',
     )
     if (scanOffline) {
       // Who is using this box: the shared workspace keeps one directory per
@@ -493,8 +496,11 @@ export function parseProbe(text) {
     raw.mounts = parseDf(get('df')).filter(isReportableMount)
     raw.psCpu = parsePs(get('ps'))
     raw.psMem = parsePs(get('psmem'))
-    raw.gpus = parseGpus(get('gpu'), get('gpuapps'))
   }
+  // GPU sections stand on their own: a probe may omit df (light probe, or a
+  // host where df failed) and still report cards and their processes.
+  if (sections.has('gpu') || sections.has('gpuapps')) raw.gpus = parseGpus(get('gpu'), get('gpuapps'))
+  if (sections.has('gpups')) raw.gpuPs = parsePs(get('gpups'))
   if (sections.has('offline') || sections.has('owners')) {
     raw.offline = {
       users: [...new Set(get('offline').map(line => line.trim()).filter(line => line !== ''))],
@@ -656,6 +662,28 @@ export function deriveSample({ prev, curr, full, dtMs, options = {} }) {
     memPercent: gpu.memTotalBytes > 0 ? round1((gpu.memUsedBytes / gpu.memTotalBytes) * 100) : null,
   }))
 
+  // GPU processes: nvidia-smi says which pid holds which card, `ps -p` fills in
+  // CPU / RSS / command line. One row per (pid, GPU) pair, largest VRAM first.
+  const gpuPsByPid = new Map((heavy.gpuPs ?? []).map(process => [process.pid, process]))
+  const gpuProcs = []
+  for (const gpu of gpus) {
+    for (const process of gpu.processes ?? []) {
+      if (typeof process.pid !== 'number') continue
+      const ps = gpuPsByPid.get(process.pid)
+      gpuProcs.push({
+        pid: process.pid,
+        name: process.name !== '' ? process.name : ps?.name ?? '',
+        gpuIndex: gpu.index,
+        gpuMemBytes: process.memBytes ?? null,
+        cpuPercent: ps?.cpuPercent ?? null,
+        memPercent: ps?.memPercent ?? null,
+        rssBytes: ps?.rssBytes ?? null,
+        command: ps?.command ?? null,
+      })
+    }
+  }
+  gpuProcs.sort((a, b) => (b.gpuMemBytes ?? 0) - (a.gpuMemBytes ?? 0))
+
   const mounts = (heavy.mounts ?? []).map(mount => ({ ...mount, usePercent: round1(mount.usePercent) }))
   mounts.sort((a, b) => (b.usePercent ?? -1) - (a.usePercent ?? -1))
 
@@ -690,6 +718,7 @@ export function deriveSample({ prev, curr, full, dtMs, options = {} }) {
     gpus,
     topCpu,
     topMem,
+    gpuProcs,
     offline: heavy.offline ?? { users: [], owners: [] },
     system: {
       ...heavy.system,

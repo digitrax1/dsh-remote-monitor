@@ -437,11 +437,11 @@ export function makeTools(monitor, book) {
 
   const processesTool = defineTool({
     name: 'rmon_processes',
-    description: 'List the busiest processes on one monitored remote machine, sorted by CPU or by resident memory, with pid, name, cpu%, mem%, RSS and the command line. Use it to find out WHO is consuming a host after rmon_status shows it is loaded. Read-only. '
-      + 'Triggers: 哪个进程, 谁占了 CPU, 谁占了内存, 进程列表, top 进程, which process, top, htop, oom, memory hog.',
+    description: 'List the busiest processes on one monitored remote machine, sorted by CPU, by resident memory, or by GPU VRAM (which processes are holding the cards), with pid, name, cpu%, mem%, RSS and the command line. Use it to find out WHO is consuming a host after rmon_status shows it is loaded. Read-only. '
+      + 'Triggers: 哪个进程, 谁占了 CPU, 谁占了内存, 谁占了 GPU, 进程列表, top 进程, which process, top, htop, oom, memory hog, GPU process.',
     parameters: {
       alias: { type: 'string', required: true, description: 'Host alias from rmon_list.' },
-      sort: { type: 'string', enum: ['cpu', 'mem'], description: 'Sort key: cpu (default) or mem.' },
+      sort: { type: 'string', enum: ['cpu', 'mem', 'gpu'], description: 'Sort key: cpu (default), mem, or gpu (VRAM held by compute processes).' },
       limit: { type: 'integer', description: 'How many rows, 1..50 (default 15).' },
       fresh: { type: 'boolean', description: 'Force a brand-new read (default true).' },
     },
@@ -453,9 +453,23 @@ export function makeTools(monitor, book) {
         const known = book.list().map(entry => entry.alias).join(', ')
         return { report: `Unknown alias '${alias}'. Known aliases: ${known === '' ? '(none)' : known}` }
       }
-      const sort = args.sort === 'mem' ? 'mem' : 'cpu'
+      const sort = args.sort === 'mem' ? 'mem' : args.sort === 'gpu' ? 'gpu' : 'cpu'
       const limit = Number.isFinite(args.limit) ? Math.max(1, Math.min(50, Math.trunc(args.limit))) : 15
-      const lines = [`${host.alias} (${host.user}@${host.host}) — top ${limit} processes by ${sort === 'mem' ? 'memory' : 'cpu'} · sampled ${formatTime(host.lastSampleAt)}`]
+      const lines = [`${host.alias} (${host.user}@${host.host}) — top ${limit} processes by ${sort === 'mem' ? 'memory' : sort === 'gpu' ? 'GPU VRAM' : 'cpu'} · sampled ${formatTime(host.lastSampleAt)}`]
+      if (sort === 'gpu') {
+        const gpuList = host.gpuProcs ?? []
+        if (gpuList.length === 0) {
+          lines.push(host.ok
+            ? '  no compute process is holding a GPU right now'
+            : `  host is unreachable: ${host.error ?? 'unknown error'}`)
+          return { report: lines.join('\n') }
+        }
+        lines.push('  pid     gpu    name                vram        cpu      rss       command')
+        for (const process of gpuList.slice(0, limit)) {
+          lines.push(`  ${pad(process.pid, 7)} ${pad('GPU' + process.gpuIndex, 6)} ${pad(process.name, 18)} ${pad(formatBytes(process.gpuMemBytes), 10)} ${pad(process.cpuPercent === null ? 'n/a' : formatPercent(process.cpuPercent), 8)} ${pad(formatBytes(process.rssBytes), 9)} ${process.command ?? ''}`)
+        }
+        return { report: lines.join('\n') }
+      }
       const list = sort === 'mem' ? (host.topMem ?? []) : (host.topCpu ?? [])
       if (list.length === 0) {
         lines.push(host.ok

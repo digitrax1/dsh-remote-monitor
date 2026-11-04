@@ -1,6 +1,6 @@
 {
   "name": "dsh-remote-monitor",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "description": "Remote host resource monitoring for the DeepSeek Harness Web GUI: CPU / memory / swap / disk usage & IO / network / NVIDIA GPU / top processes over SSH, with a live sidebar dashboard, an idle-capacity ranking (which machine can take the next job), a low-utilisation reminder, an idle index (time × GPU utilisation), a sidebar-footer machine list, and read-only agent tools (rmon_*). Host list is discovered from ~/.ssh/config and the dsh-ssh store, so nothing has to be entered twice.",
   "icon": "icon.svg",
